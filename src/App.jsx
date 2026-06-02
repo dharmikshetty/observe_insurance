@@ -56,7 +56,11 @@ export default function App() {
         <div className="header-right">
           {import.meta.env.VITE_VOICE_URL && (
             <button 
-              onClick={() => window.open(import.meta.env.VITE_VOICE_URL, '_blank', 'noopener,noreferrer')}
+              onClick={() => {
+                const rawUrl = import.meta.env.VITE_VOICE_URL;
+                const cleanUrl = rawUrl.replace(/^["']|["']$/g, '');
+                window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+              }}
               className="voice-btn"
               style={{ marginRight: '16px' }}
             >
