@@ -71,8 +71,8 @@ export default function CustomersTable({ rows, loading, totalCount, onLoadMore }
               <tr><td colSpan={8} className="empty">Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={8} className="empty">No customers found.</td></tr>
-            ) : rows.map(r => (
-              <tr key={r.id}>
+            ) : rows.map((r, idx) => (
+              <tr key={r.policy_number ?? idx}>
                 <td style={{ fontWeight: 600, color: '#f1f5f9' }}>{r.name}</td>
                 <td style={{ color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.phone_normalized}</td>
                 <td style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>{r.policy_number}</td>

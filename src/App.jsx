@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from './supabaseClient'
 import CustomersTable from './components/CustomersTable'
 import CallLogsTable from './components/CallLogsTable'
 import './index.css'
@@ -27,16 +26,14 @@ export default function App() {
     if (isInitial) setLoadingCustomers(true)
     setError(null)
     try {
-      const { data, error: err, count } = await supabase
-        .from('customers')
-        .select('*', { count: 'exact' })
-        .order('name')
-        .range(0, limit - 1)
-
-      if (err) throw err
-
-      setCustomers(data ?? [])
-      setCustomersCount(count ?? 0)
+      const res = await fetch(`/api/customers?limit=${limit}`)
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText || 'Failed to fetch customers')
+      }
+      const json = await res.json()
+      setCustomers(json.data ?? [])
+      setCustomersCount(json.count ?? 0)
       setLastSync(new Date())
     } catch (err) {
       console.error('Error fetching customers:', err)
@@ -50,16 +47,14 @@ export default function App() {
     if (isInitial) setLoadingLogs(true)
     setError(null)
     try {
-      const { data, error: err, count } = await supabase
-        .from('call_logs')
-        .select('*', { count: 'exact' })
-        .order('timestamp', { ascending: false })
-        .range(0, limit - 1)
-
-      if (err) throw err
-
-      setLogs(data ?? [])
-      setLogsCount(count ?? 0)
+      const res = await fetch(`/api/logs?limit=${limit}`)
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText || 'Failed to fetch call logs')
+      }
+      const json = await res.json()
+      setLogs(json.data ?? [])
+      setLogsCount(json.count ?? 0)
       setLastSync(new Date())
     } catch (err) {
       console.error('Error fetching call logs:', err)
@@ -73,33 +68,13 @@ export default function App() {
     setError(null)
     try {
       await Promise.all([
-        supabase
-          .from('customers')
-          .select('*', { count: 'exact' })
-          .order('name')
-          .range(0, cLimit - 1)
-          .then(res => {
-            if (res.error) throw res.error
-            setCustomers(res.data ?? [])
-            setCustomersCount(res.count ?? 0)
-          }),
-        supabase
-          .from('call_logs')
-          .select('*', { count: 'exact' })
-          .order('timestamp', { ascending: false })
-          .range(0, lLimit - 1)
-          .then(res => {
-            if (res.error) throw res.error
-            setLogs(res.data ?? [])
-            setLogsCount(res.count ?? 0)
-          })
+        fetchCustomers(cLimit, false),
+        fetchLogs(lLimit, false)
       ])
-      setLastSync(new Date())
     } catch (err) {
-      console.error('Error refreshing dashboard data:', err)
-      setError(err.message || String(err))
+      console.error('All data sync failed:', err);
     }
-  }, [])
+  }, [fetchCustomers, fetchLogs])
 
   // Sync / initial load of customers when limit changes
   useEffect(() => {

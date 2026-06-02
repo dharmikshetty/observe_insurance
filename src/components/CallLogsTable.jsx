@@ -102,12 +102,12 @@ export default function CallLogsTable({ rows, loading, totalCount, onLoadMore })
               <tr><td colSpan={6} className="empty">Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="empty">No calls logged yet.</td></tr>
-            ) : rows.map(r => {
+            ) : rows.map((r, idx) => {
               const hasRealName = r.caller_name && r.caller_name !== 'Unknown' && r.caller_name !== 'TEST'
               const isEscalated = r.escalated
 
               return (
-                <tr key={r.id}>
+                <tr key={r.timestamp ? `${r.timestamp}-${idx}` : idx}>
                   <td style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>
                     {fmtTime(r.timestamp)}
                   </td>
