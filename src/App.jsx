@@ -76,7 +76,7 @@ export default function App() {
               onClick={() => {
                 const rawUrl = import.meta.env.VITE_VOICE_URL;
                 if (!rawUrl) return;
-                const cleanUrl = rawUrl.replace(/^["']|["']$/g, '').trim();
+                const cleanUrl = rawUrl.replace(/^["'\\%22%27\s]+|["'\\%22%27\s]+$/gi, '');
                 window.open(cleanUrl, '_blank', 'noopener,noreferrer');
               }}
               className="voice-btn"
