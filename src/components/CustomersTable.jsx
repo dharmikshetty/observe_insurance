@@ -45,12 +45,12 @@ function StatusBadge({ status }) {
   )
 }
 
-export default function CustomersTable({ rows, loading }) {
+export default function CustomersTable({ rows, loading, totalCount, onLoadMore }) {
   return (
     <div className="card">
       <div className="card-header">
         <h2>Customers &amp; Claims</h2>
-        <span className="count">{loading ? '…' : rows.length}</span>
+        <span className="count">{loading && rows.length === 0 ? '…' : totalCount}</span>
       </div>
       <div className="table-wrap">
         <table>
@@ -117,6 +117,17 @@ export default function CustomersTable({ rows, loading }) {
           </tbody>
         </table>
       </div>
+      {rows.length < totalCount && (
+        <div className="card-footer">
+          <button 
+            onClick={onLoadMore} 
+            className="load-more-btn" 
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'View More'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

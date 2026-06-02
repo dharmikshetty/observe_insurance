@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import CustomersTable from './components/CustomersTable'
 import CallLogsTable from './components/CallLogsTable'
@@ -8,60 +8,149 @@ const REFRESH_INTERVAL = Number(import.meta.env.VITE_SYNC_INTERVAL_MS) || 60_000
 
 export default function App() {
   const [customers, setCustomers] = useState([])
+  const [customersLimit, setCustomersLimit] = useState(10)
+  const [customersCount, setCustomersCount] = useState(0)
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
+
   const [logs, setLogs]           = useState([])
-  const [loading, setLoading]     = useState(true)
+  const [logsLimit, setLogsLimit] = useState(10)
+  const [logsCount, setLogsCount] = useState(0)
+  const [loadingLogs, setLoadingLogs] = useState(true)
+
   const [lastSync, setLastSync]   = useState(null)
   const [error, setError]         = useState(null)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const customersLoadedRef = useRef(false)
+  const logsLoadedRef = useRef(false)
+
+  const fetchCustomers = useCallback(async (limit, isInitial = false) => {
+    if (isInitial) setLoadingCustomers(true)
     setError(null)
     try {
-      const [customersRes, logsRes] = await Promise.all([
-        supabase.from('customers').select('*').order('name'),
-        supabase
-          .from('call_logs')
-          .select('*')
-          .order('timestamp', { ascending: false })
-          .limit(50)
-      ])
+      const { data, error: err, count } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact' })
+        .order('name')
+        .range(0, limit - 1)
 
-      if (customersRes.error) throw customersRes.error
-      if (logsRes.error) throw logsRes.error
+      if (err) throw err
 
-      setCustomers(customersRes.data ?? [])
-      setLogs(logsRes.data ?? [])
+      setCustomers(data ?? [])
+      setCustomersCount(count ?? 0)
       setLastSync(new Date())
     } catch (err) {
-      console.error('Error fetching dashboard data:', err)
+      console.error('Error fetching customers:', err)
       setError(err.message || String(err))
     } finally {
-      setLoading(false)
+      setLoadingCustomers(false)
     }
   }, [])
 
+  const fetchLogs = useCallback(async (limit, isInitial = false) => {
+    if (isInitial) setLoadingLogs(true)
+    setError(null)
+    try {
+      const { data, error: err, count } = await supabase
+        .from('call_logs')
+        .select('*', { count: 'exact' })
+        .order('timestamp', { ascending: false })
+        .range(0, limit - 1)
+
+      if (err) throw err
+
+      setLogs(data ?? [])
+      setLogsCount(count ?? 0)
+      setLastSync(new Date())
+    } catch (err) {
+      console.error('Error fetching call logs:', err)
+      setError(err.message || String(err))
+    } finally {
+      setLoadingLogs(false)
+    }
+  }, [])
+
+  const fetchAllData = useCallback(async (cLimit, lLimit) => {
+    setError(null)
+    try {
+      await Promise.all([
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact' })
+          .order('name')
+          .range(0, cLimit - 1)
+          .then(res => {
+            if (res.error) throw res.error
+            setCustomers(res.data ?? [])
+            setCustomersCount(res.count ?? 0)
+          }),
+        supabase
+          .from('call_logs')
+          .select('*', { count: 'exact' })
+          .order('timestamp', { ascending: false })
+          .range(0, lLimit - 1)
+          .then(res => {
+            if (res.error) throw res.error
+            setLogs(res.data ?? [])
+            setLogsCount(res.count ?? 0)
+          })
+      ])
+      setLastSync(new Date())
+    } catch (err) {
+      console.error('Error refreshing dashboard data:', err)
+      setError(err.message || String(err))
+    }
+  }, [])
+
+  // Sync / initial load of customers when limit changes
   useEffect(() => {
     let active = true;
-
-    // Use setTimeout to defer initial state updates and avoid synchronous setState warnings in useEffect
     const initTimer = setTimeout(() => {
       if (active) {
-        fetchData();
+        const isInitial = !customersLoadedRef.current;
+        if (isInitial) {
+          customersLoadedRef.current = true;
+        }
+        fetchCustomers(customersLimit, isInitial);
       }
     }, 0);
+    return () => {
+      active = false;
+      clearTimeout(initTimer);
+    };
+  }, [customersLimit, fetchCustomers])
 
+  // Sync / initial load of logs when limit changes
+  useEffect(() => {
+    let active = true;
+    const initTimer = setTimeout(() => {
+      if (active) {
+        const isInitial = !logsLoadedRef.current;
+        if (isInitial) {
+          logsLoadedRef.current = true;
+        }
+        fetchLogs(logsLimit, isInitial);
+      }
+    }, 0);
+    return () => {
+      active = false;
+      clearTimeout(initTimer);
+    };
+  }, [logsLimit, fetchLogs])
+
+  // Periodic refresh
+  useEffect(() => {
+    let active = true;
     const intervalId = setInterval(() => {
       if (active) {
-        fetchData();
+        fetchAllData(customersLimit, logsLimit);
       }
     }, REFRESH_INTERVAL);
 
     return () => {
       active = false;
-      clearTimeout(initTimer);
       clearInterval(intervalId);
     };
-  }, [fetchData])
+  }, [customersLimit, logsLimit, fetchAllData])
 
   return (
     <div className="app">
@@ -103,8 +192,18 @@ export default function App() {
       )}
 
       <div className="grid">
-        <CustomersTable rows={customers} loading={loading} />
-        <CallLogsTable  rows={logs}      loading={loading} />
+        <CustomersTable 
+          rows={customers} 
+          loading={loadingCustomers} 
+          totalCount={customersCount}
+          onLoadMore={() => setCustomersLimit(prev => prev + 10)}
+        />
+        <CallLogsTable  
+          rows={logs}      
+          loading={loadingLogs} 
+          totalCount={logsCount}
+          onLoadMore={() => setLogsLimit(prev => prev + 10)}
+        />
       </div>
     </div>
   )
