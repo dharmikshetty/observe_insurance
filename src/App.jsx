@@ -41,9 +41,26 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    fetchData()
-    const id = setInterval(fetchData, REFRESH_INTERVAL)
-    return () => clearInterval(id)
+    let active = true;
+
+    // Use setTimeout to defer initial state updates and avoid synchronous setState warnings in useEffect
+    const initTimer = setTimeout(() => {
+      if (active) {
+        fetchData();
+      }
+    }, 0);
+
+    const intervalId = setInterval(() => {
+      if (active) {
+        fetchData();
+      }
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      active = false;
+      clearTimeout(initTimer);
+      clearInterval(intervalId);
+    };
   }, [fetchData])
 
   return (
@@ -58,7 +75,8 @@ export default function App() {
             <button 
               onClick={() => {
                 const rawUrl = import.meta.env.VITE_VOICE_URL;
-                const cleanUrl = rawUrl.replace(/^["']|["']$/g, '');
+                if (!rawUrl) return;
+                const cleanUrl = rawUrl.replace(/^["']|["']$/g, '').trim();
                 window.open(cleanUrl, '_blank', 'noopener,noreferrer');
               }}
               className="voice-btn"
